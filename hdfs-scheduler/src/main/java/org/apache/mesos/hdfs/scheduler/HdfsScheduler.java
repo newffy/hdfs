@@ -8,6 +8,7 @@ import org.apache.mesos.MesosSchedulerDriver;
 import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Credential;
+import org.apache.mesos.Protos.DiscoveryInfo;
 import org.apache.mesos.Protos.Environment;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
@@ -25,6 +26,8 @@ import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Protos.Value;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.hdfs.config.HdfsFrameworkConfig;
+import org.apache.mesos.hdfs.config.NamedPort;
+import org.apache.mesos.hdfs.config.PortIterator;
 import org.apache.mesos.hdfs.state.AcquisitionPhase;
 import org.apache.mesos.hdfs.state.LiveState;
 import org.apache.mesos.hdfs.state.PersistenceException;
@@ -310,6 +313,13 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     return null;
   }
 
+  private DiscoveryInfo getTaskDiscoveryInfo(String taskType) {
+    DiscoveryInfo info = DiscoveryInfo.newBuilder()
+      .setVisibility(DiscoveryInfo.Visibility.CLUSTER).build();
+
+    return info;
+  }
+
   private boolean launchNode(SchedulerDriver driver, Offer offer,
     String nodeName, List<String> taskTypes, String executorName) {
     // nodeName is the type of executor to launch
@@ -326,9 +336,11 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     for (String taskType : taskTypes) {
       List<Resource> taskResources = getTaskResources(taskType, offer);
       String taskName = getNextTaskName(taskType);
+
       TaskID taskId = TaskID.newBuilder()
         .setValue(String.format("task.%s.%s", taskType, taskIdName))
         .build();
+
       TaskInfo task = TaskInfo.newBuilder()
         .setExecutor(executorInfo)
         .setName(taskName)
@@ -344,7 +356,7 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
       persistenceStore.addHdfsNode(taskId, offer.getHostname(), taskType, taskName);
     }
 
-    log.info("Launching tasks: %s", tasks);
+    log.info(String.format("Launching tasks: %s", tasks));
 
     driver.launchTasks(Arrays.asList(offer.getId()), tasks);
     return true;
@@ -470,15 +482,20 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     List<Resource> resources = new ArrayList<Resource>();
     resources.add(resourceFactory.createCpuResource(cpu));
     resources.add(resourceFactory.createMemResource(mem));
-    resources.addAll(getPortResources(taskName));
+
+    try {
+      resources.addAll(getPortResources(taskName, offer));
+    } catch (Exception ex) {
+      log.error(String.format("Failed to add port resources with exception: %s", ex));
+    }
 
     return resources;
   }
 
-  private List<Resource> getPortResources(String taskType) {
+  private List<Resource> getPortResources(String taskType, Offer offer) throws Exception {
     List<Resource> resources = new ArrayList<Resource>();
-    for (Long port : config.getTaskPorts(taskType)) {
-      resources.add(resourceFactory.createPortResource(port, port));
+    for (NamedPort port : config.getTaskPorts(taskType, new PortIterator(offer))) {
+      resources.add(resourceFactory.createPortResource(port.getPort(), port.getPort()));
     }
 
     return resources;

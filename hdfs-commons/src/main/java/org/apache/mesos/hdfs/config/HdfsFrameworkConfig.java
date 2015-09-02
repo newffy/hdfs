@@ -8,6 +8,7 @@ import org.apache.hadoop.fs.Path;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -31,21 +32,6 @@ public class HdfsFrameworkConfig {
   private static final double DEFAULT_NAMENODE_CPUS = 1;
   private static final double DEFAULT_JOURNAL_CPUS = 1;
   private static final double DEFAULT_DATANODE_CPUS = 1;
-
-  // See port reference for defaults:
-  // http://blog.cloudera.com/blog/2009/08/hadoop-default-ports-quick-reference/
-  // See hdfs-site.xml for special ports.
-  private static final int DEFAULT_JOURNALNODE_PORT = 8485;
-
-  private static final int DEFAULT_NAMENODE_IPC_PORT = 8020;
-  private static final int DEFAULT_NAMENODE_HTTP_PORT = 5070;
-  private static final int DEFAULT_NAMENODE_RPC_PORT = 5071;
-
-  private static final int DEFAULT_ZOOKEEPER_PORT = 2181;
-
-  private static final int DEFAULT_DATANODE_HTTP_PORT = 50075;
-  private static final int DEFAULT_DATANODE_DFS_PORT = 50010;
-  private static final int DEFAULT_DATANODE_IPC_PORT = 50020;
 
   private static final double DEFAULT_JVM_OVERHEAD = 1.35;
   private static final int DEFAULT_JOURNAL_NODE_COUNT = 3;
@@ -203,16 +189,16 @@ public class HdfsFrameworkConfig {
     return cpus;
   }
 
-  public List<Long> getTaskPorts(String taskType) {
+  public List<NamedPort> getTaskPorts(String taskType, PortIterator iter) throws Exception {
     switch (taskType) {
       case "zkfc":
-        return getZookeeperPorts();
+        return getZookeeperPorts(iter);
       case "namenode":
-        return getNameNodePorts();
+        return getNameNodePorts(iter);
       case "datanode":
-        return getDataNodePorts();
+        return getDataNodePorts(iter);
       case "journalnode":
-        return getJournalNodePorts();
+        return getJournalNodePorts(iter);
       default:
         final String msg = "Invalid request for ports for taskType= " + taskType;
         log.error(msg);
@@ -320,66 +306,40 @@ public class HdfsFrameworkConfig {
   }
 
   // Name Node ports
-  List<Long> getNameNodePorts() {
-    long ipcPort = getNameNodeIpcPort();
-    long httpPort = getNameNodeHttpPort();
-    long rpcPort = getNameNodeRpcPort();
+  public List<NamedPort> getNameNodePorts(PortIterator iter) throws Exception {
+    List<NamedPort> ports = new ArrayList<NamedPort>();
+    ports.add(new NamedPort("ipc", iter.getNextPort()));
+    ports.add(new NamedPort("http", iter.getNextPort()));
+    ports.add(new NamedPort("rpc", iter.getNextPort()));
 
-    return Arrays.asList(ipcPort, httpPort, rpcPort);
-  }
-
-  public long getNameNodeIpcPort() {
-    return getConf().getInt("mesos.hdfs.namenode.ipc.port", DEFAULT_NAMENODE_IPC_PORT);
-  }
-
-  public long getNameNodeHttpPort() {
-    return getConf().getInt("mesos.hdfs.namenode.http.port", DEFAULT_NAMENODE_HTTP_PORT);
-  }
-
-  public long getNameNodeRpcPort() {
-    return getConf().getInt("mesos.hdfs.namenode.http.port", DEFAULT_NAMENODE_RPC_PORT);
+    return ports;
   }
 
   // Journal Node ports
-  public List<Long> getJournalNodePorts() {
-    return Arrays.asList(getJournalNodePort());
-  }
+  public List<NamedPort> getJournalNodePorts(PortIterator iter) throws Exception {
+    List<NamedPort> ports = new ArrayList<NamedPort>();
+    ports.add(new NamedPort("ipc", iter.getNextPort()));
 
-  public long getJournalNodePort() {
-    return getConf().getInt("mesos.hdfs.journalnode.port", DEFAULT_JOURNALNODE_PORT);
+    return ports;
   }
 
   // Zookeeper ports
-  public List<Long> getZookeeperPorts() {
-    return Arrays.asList(getZookeeperPort());
-  }
+  public List<NamedPort> getZookeeperPorts(PortIterator iter) throws Exception {
+    List<NamedPort> ports = new ArrayList<NamedPort>();
+    ports.add(new NamedPort("ipc", iter.getNextPort()));
 
-  public long getZookeeperPort() {
-    return getConf().getInt("mesos.hdfs.zookeeper.port", DEFAULT_ZOOKEEPER_PORT);
+    return ports;
   }
 
   // Data Node ports
-  public List<Long> getDataNodePorts() {
-    long httpPort = getDataNodeHttpPort();
-    long dfsPort = getDataNodeDfsPort();
-    long ipcPort = getDataNodeIpcPort();
+  public List<NamedPort> getDataNodePorts(PortIterator iter) throws Exception {
+    List<NamedPort> ports = new ArrayList<NamedPort>();
+    ports.add(new NamedPort("ipc", iter.getNextPort()));
+    ports.add(new NamedPort("http", iter.getNextPort()));
+    ports.add(new NamedPort("rpc", iter.getNextPort()));
 
-    return Arrays.asList(httpPort, dfsPort, ipcPort);
+    return ports;
   }
-
-  public long getDataNodeHttpPort() {
-    return getConf().getInt("mesos.hdfs.datanode.http.port", DEFAULT_DATANODE_HTTP_PORT);
-  }
-
-  public long getDataNodeDfsPort() {
-    return getConf().getInt("mesos.hdfs.datanode.dfs.port", DEFAULT_DATANODE_DFS_PORT);
-  }
-
-  public long getDataNodeIpcPort() {
-    return getConf().getInt("mesos.hdfs.datanode.ipc.port", DEFAULT_DATANODE_IPC_PORT);
-  }
-
-
 
   public int getReconciliationTimeout() {
     return getConf().getInt("mesos.reconciliation.timeout.sec", DEFAULT_RECONCILIATION_TIMEOUT_SEC);
