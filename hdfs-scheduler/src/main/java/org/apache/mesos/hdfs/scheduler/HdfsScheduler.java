@@ -344,6 +344,8 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
       persistenceStore.addHdfsNode(taskId, offer.getHostname(), taskType, taskName);
     }
 
+    log.info("Launching tasks: %s", tasks);
+
     driver.launchTasks(Arrays.asList(offer.getId()), tasks);
     return true;
   }
