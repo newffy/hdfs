@@ -8,6 +8,8 @@ import org.apache.hadoop.fs.Path;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -29,6 +31,21 @@ public class HdfsFrameworkConfig {
   private static final double DEFAULT_NAMENODE_CPUS = 1;
   private static final double DEFAULT_JOURNAL_CPUS = 1;
   private static final double DEFAULT_DATANODE_CPUS = 1;
+
+  // See port reference for defaults:
+  // http://blog.cloudera.com/blog/2009/08/hadoop-default-ports-quick-reference/
+  // See hdfs-site.xml for special ports.
+  private static final int DEFAULT_JOURNALNODE_PORT = 8485;
+
+  private static final int DEFAULT_NAMENODE_IPC_PORT = 8020;
+  private static final int DEFAULT_NAMENODE_HTTP_PORT = 5070;
+  private static final int DEFAULT_NAMENODE_RPC_PORT = 5071;
+
+  private static final int DEFAULT_ZOOKEEPER_PORT = 2181;
+
+  private static final int DEFAULT_DATANODE_HTTP_PORT = 50075;
+  private static final int DEFAULT_DATANODE_DFS_PORT = 50010;
+  private static final int DEFAULT_DATANODE_IPC_PORT = 50020;
 
   private static final double DEFAULT_JVM_OVERHEAD = 1.35;
   private static final int DEFAULT_JOURNAL_NODE_COUNT = 3;
@@ -123,29 +140,6 @@ public class HdfsFrameworkConfig {
     return getHadoopHeapSize();
   }
 
-  public int getTaskHeapSize(String taskName) {
-    int size;
-    switch (taskName) {
-      case "zkfc":
-        size = getZkfcHeapSize();
-        break;
-      case "namenode":
-        size = getNameNodeHeapSize();
-        break;
-      case "datanode":
-        size = getDataNodeHeapSize();
-        break;
-      case "journalnode":
-        size = getJournalNodeHeapSize();
-        break;
-      default:
-        final String msg = "Invalid request for heapsize for taskName = " + taskName;
-        log.error(msg);
-        throw new ConfigurationException(msg);
-    }
-    return size;
-  }
-
   public double getJvmOverhead() {
     return getConf().getDouble("mesos.hdfs.jvm.overhead", DEFAULT_JVM_OVERHEAD);
   }
@@ -207,6 +201,46 @@ public class HdfsFrameworkConfig {
         throw new ConfigurationException(msg);
     }
     return cpus;
+  }
+
+  public List<Long> getTaskPorts(String taskType) {
+    switch (taskType) {
+      case "zkfc":
+        return getZookeeperPorts();
+      case "namenode":
+        return getNameNodePorts();
+      case "datanode":
+        return getDataNodePorts();
+      case "journalnode":
+        return getJournalNodePorts();
+      default:
+        final String msg = "Invalid request for ports for taskType= " + taskType;
+        log.error(msg);
+        throw new ConfigurationException(msg);
+    }
+  }
+
+  public int getTaskHeapSize(String taskName) {
+    int size;
+    switch (taskName) {
+      case "zkfc":
+        size = getZkfcHeapSize();
+        break;
+      case "namenode":
+        size = getNameNodeHeapSize();
+        break;
+      case "datanode":
+        size = getDataNodeHeapSize();
+        break;
+      case "journalnode":
+        size = getJournalNodeHeapSize();
+        break;
+      default:
+        final String msg = "Invalid request for heapsize for taskName = " + taskName;
+        log.error(msg);
+        throw new ConfigurationException(msg);
+    }
+    return size;
   }
 
   public int getJournalNodeCount() {
@@ -284,6 +318,68 @@ public class HdfsFrameworkConfig {
     }
     return Integer.parseInt(configServerPortString);
   }
+
+  // Name Node ports
+  List<Long> getNameNodePorts() {
+    long ipcPort = getNameNodeIpcPort();
+    long httpPort = getNameNodeHttpPort();
+    long rpcPort = getNameNodeRpcPort();
+
+    return Arrays.asList(ipcPort, httpPort, rpcPort);
+  }
+
+  public long getNameNodeIpcPort() {
+    return getConf().getInt("mesos.hdfs.namenode.ipc.port", DEFAULT_NAMENODE_IPC_PORT);
+  }
+
+  public long getNameNodeHttpPort() {
+    return getConf().getInt("mesos.hdfs.namenode.http.port", DEFAULT_NAMENODE_HTTP_PORT);
+  }
+
+  public long getNameNodeRpcPort() {
+    return getConf().getInt("mesos.hdfs.namenode.http.port", DEFAULT_NAMENODE_RPC_PORT);
+  }
+
+  // Journal Node ports
+  public List<Long> getJournalNodePorts() {
+    return Arrays.asList(getJournalNodePort());
+  }
+
+  public long getJournalNodePort() {
+    return getConf().getInt("mesos.hdfs.journalnode.port", DEFAULT_JOURNALNODE_PORT);
+  }
+
+  // Zookeeper ports
+  public List<Long> getZookeeperPorts() {
+    return Arrays.asList(getZookeeperPort());
+  }
+
+  public long getZookeeperPort() {
+    return getConf().getInt("mesos.hdfs.zookeeper.port", DEFAULT_ZOOKEEPER_PORT);
+  }
+
+  // Data Node ports
+  public List<Long> getDataNodePorts() {
+    long httpPort = getDataNodeHttpPort();
+    long dfsPort = getDataNodeDfsPort();
+    long ipcPort = getDataNodeIpcPort();
+
+    return Arrays.asList(httpPort, dfsPort, ipcPort);
+  }
+
+  public long getDataNodeHttpPort() {
+    return getConf().getInt("mesos.hdfs.datanode.http.port", DEFAULT_DATANODE_HTTP_PORT);
+  }
+
+  public long getDataNodeDfsPort() {
+    return getConf().getInt("mesos.hdfs.datanode.dfs.port", DEFAULT_DATANODE_DFS_PORT);
+  }
+
+  public long getDataNodeIpcPort() {
+    return getConf().getInt("mesos.hdfs.datanode.ipc.port", DEFAULT_DATANODE_IPC_PORT);
+  }
+
+
 
   public int getReconciliationTimeout() {
     return getConf().getInt("mesos.reconciliation.timeout.sec", DEFAULT_RECONCILIATION_TIMEOUT_SEC);
