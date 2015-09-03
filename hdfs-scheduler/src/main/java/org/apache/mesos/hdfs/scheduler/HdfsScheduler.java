@@ -228,15 +228,19 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
             driver.declineOffer(offer.getId());
             break;
           case JOURNAL_NODES:
-            if (tryToLaunchJournalNode(driver, offer)) {
+            JournalNode jn = new JournalNode(liveState, persistenceStore, config);
+            if (jn.launch(driver, offer)) {
               acceptedOffer = true;
             } else {
               driver.declineOffer(offer.getId());
             }
             break;
           case START_NAME_NODES:
-            if (journalNodesResolvable && tryToLaunchNameNode(driver, offer)) {
-              acceptedOffer = true;
+            if (journalNodesResolvable) {
+              NameNode nn = new NameNode(liveState, persistenceStore, config);
+              if (nn.launch(driver, offer)) {
+                acceptedOffer = true;
+              }
             } else {
               driver.declineOffer(offer.getId());
             }
@@ -245,7 +249,8 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
             driver.declineOffer(offer.getId());
             break;
           case DATA_NODES:
-            if (tryToLaunchDataNode(driver, offer)) {
+            DataNode dn = new DataNode(liveState, persistenceStore, config);
+            if (dn.launch(driver, offer)) {
               acceptedOffer = true;
             } else {
               driver.declineOffer(offer.getId());
@@ -320,181 +325,6 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     return info;
   }
 
-  private boolean launchNode(SchedulerDriver driver, Offer offer,
-    String nodeName, List<String> taskTypes, String executorName) {
-    // nodeName is the type of executor to launch
-    // executorName is to distinguish different types of nodes
-    // taskType is the type of task in mesos to launch on the node
-    // taskName is a name chosen to identify the task in mesos and mesos-dns (if used)
-    log.info(String.format("Launching node of type %s with tasks %s", nodeName,
-      taskTypes.toString()));
-
-    String taskIdName = String.format("%s.%s.%d", nodeName, executorName,
-      System.currentTimeMillis());
-
-    ExecutorInfo executorInfo = createExecutor(taskIdName, nodeName, executorName);
-    PortIterator iter = new PortIterator(offer);
-
-    List<TaskInfo> tasks = new ArrayList<>();
-    for (String taskType : taskTypes) {
-      List<Resource> taskResources = getTaskResources(taskType, iter);
-      String taskName = getNextTaskName(taskType);
-
-      TaskID taskId = TaskID.newBuilder()
-        .setValue(String.format("task.%s.%s", taskType, taskIdName))
-        .build();
-
-      TaskInfo task = TaskInfo.newBuilder()
-        .setExecutor(executorInfo)
-        .setName(taskName)
-        .setTaskId(taskId)
-        .setSlaveId(offer.getSlaveId())
-        .addAllResources(taskResources)
-        .setData(ByteString.copyFromUtf8(
-          String.format("bin/hdfs-mesos-%s", taskType)))
-        .build();
-      tasks.add(task);
-
-      liveState.addStagingTask(taskId);
-      persistenceStore.addHdfsNode(taskId, offer.getHostname(), taskType, taskName);
-    }
-
-    log.info(String.format("Launching tasks: %s", tasks));
-
-    driver.launchTasks(Arrays.asList(offer.getId()), tasks);
-    return true;
-  }
-
-  private String getNextTaskName(String taskType) {
-
-    if (taskType.equals(HDFSConstants.NAME_NODE_ID)) {
-      Collection<String> nameNodeTaskNames = persistenceStore.getNameNodeTaskNames().values();
-      for (int i = 1; i <= HDFSConstants.TOTAL_NAME_NODES; i++) {
-        if (!nameNodeTaskNames.contains(HDFSConstants.NAME_NODE_ID + i)) {
-          return HDFSConstants.NAME_NODE_ID + i;
-        }
-      }
-      String errorStr = "Cluster is in inconsistent state. " +
-        "Trying to launch more namenodes, but they are all already running.";
-      log.error(errorStr);
-      throw new SchedulerException(errorStr);
-    }
-    if (taskType.equals(HDFSConstants.JOURNAL_NODE_ID)) {
-      Collection<String> journalNodeTaskNames = persistenceStore.getJournalNodeTaskNames().values();
-      for (int i = 1; i <= config.getJournalNodeCount(); i++) {
-        if (!journalNodeTaskNames.contains(HDFSConstants.JOURNAL_NODE_ID + i)) {
-          return HDFSConstants.JOURNAL_NODE_ID + i;
-        }
-      }
-      String errorStr = "Cluster is in inconsistent state. " +
-        "Trying to launch more journalnodes, but they all are already running.";
-      log.error(errorStr);
-      throw new SchedulerException(errorStr);
-    }
-    return taskType;
-  }
-
-  private ExecutorInfo createExecutor(String taskIdName, String nodeName, String executorName) {
-    int confServerPort = config.getConfigServerPort();
-
-    String cmd = "export JAVA_HOME=$MESOS_DIRECTORY/" + config.getJreVersion()
-      + " && env ; cd hdfs-mesos-* && "
-      + "exec `if [ -z \"$JAVA_HOME\" ]; then echo java; "
-      + "else echo $JAVA_HOME/bin/java; fi` "
-      + "$HADOOP_OPTS "
-      + "$EXECUTOR_OPTS "
-      + "-cp lib/*.jar org.apache.mesos.hdfs.executor." + executorName;
-
-    return ExecutorInfo
-      .newBuilder()
-      .setName(nodeName + " executor")
-      .setExecutorId(ExecutorID.newBuilder().setValue("executor." + taskIdName).build())
-      .addAllResources(getExecutorResources())
-      .setCommand(
-        CommandInfo
-          .newBuilder()
-          .addAllUris(
-            Arrays.asList(
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(
-                  String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                    confServerPort,
-                    HDFSConstants.HDFS_BINARY_FILE_NAME))
-                .build(),
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(
-                  String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                    confServerPort,
-                    HDFSConstants.HDFS_CONFIG_FILE_NAME))
-                .build(),
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(config.getJreUrl())
-                .build()))
-          .setEnvironment(Environment.newBuilder()
-            .addAllVariables(Arrays.asList(
-              Environment.Variable.newBuilder()
-                .setName("LD_LIBRARY_PATH")
-                .setValue(config.getLdLibraryPath()).build(),
-              Environment.Variable.newBuilder()
-                .setName("HADOOP_OPTS")
-                .setValue(config.getJvmOpts()).build(),
-              Environment.Variable.newBuilder()
-                .setName("HADOOP_HEAPSIZE")
-                .setValue(String.format("%d", config.getHadoopHeapSize())).build(),
-              Environment.Variable.newBuilder()
-                .setName("HADOOP_NAMENODE_OPTS")
-                .setValue("-Xmx" + config.getNameNodeHeapSize()
-                  + "m -Xms" + config.getNameNodeHeapSize() + "m").build(),
-              Environment.Variable.newBuilder()
-                .setName("HADOOP_DATANODE_OPTS")
-                .setValue("-Xmx" + config.getDataNodeHeapSize()
-                  + "m -Xms" + config.getDataNodeHeapSize() + "m").build(),
-              Environment.Variable.newBuilder()
-                .setName("EXECUTOR_OPTS")
-                .setValue("-Xmx" + config.getExecutorHeap()
-                  + "m -Xms" + config.getExecutorHeap() + "m").build())))
-          .setValue(cmd).build())
-      .build();
-  }
-
-  private List<Resource> getExecutorResources() {
-    return Arrays.asList(
-      Resource.newBuilder()
-        .setName("cpus")
-        .setType(Value.Type.SCALAR)
-        .setScalar(Value.Scalar.newBuilder()
-          .setValue(config.getExecutorCpus()).build())
-        .setRole(config.getHdfsRole())
-        .build(),
-      Resource.newBuilder()
-        .setName("mem")
-        .setType(Value.Type.SCALAR)
-        .setScalar(Value.Scalar.newBuilder()
-          .setValue(config.getExecutorHeap() * config.getJvmOverhead()).build())
-        .setRole(config.getHdfsRole())
-        .build());
-  }
-
-  private List<Resource> getTaskResources(String taskName, PortIterator iter) {
-    double cpu = config.getTaskCpus(taskName);
-    double mem = config.getTaskHeapSize(taskName) * config.getJvmOverhead();
-
-    List<Resource> resources = new ArrayList<Resource>();
-    resources.add(resourceFactory.createCpuResource(cpu));
-    resources.add(resourceFactory.createMemResource(mem));
-
-    try {
-      resources.addAll(getPortResources(taskName, iter));
-    } catch (Exception ex) {
-      log.error(String.format("Failed to add port resources with exception: %s", ex));
-    }
-
-    return resources;
-  }
-
   private List<Resource> getPortResources(String taskType, PortIterator iter) throws Exception {
     List<Resource> resources = new ArrayList<Resource>();
     for (NamedPort port : config.getTaskPorts(taskType, iter)) {
@@ -502,115 +332,6 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     }
 
     return resources;
-  }
-
-  private boolean tryToLaunchJournalNode(SchedulerDriver driver, Offer offer) {
-    if (offerNotEnoughResources(offer, config.getJournalNodeCpus(),
-      config.getJournalNodeHeapSize())) {
-      log.info("Offer does not have enough resources");
-      return false;
-    }
-
-    boolean launch = false;
-    List<String> deadJournalNodes = persistenceStore.getDeadJournalNodes();
-
-    log.info(deadJournalNodes);
-
-    if (deadJournalNodes.isEmpty()) {
-      if (persistenceStore.getJournalNodes().size() == config.getJournalNodeCount()) {
-        log.info(String.format("Already running %s journalnodes", config.getJournalNodeCount()));
-      } else if (persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Already running journalnode on %s", offer.getHostname()));
-      } else if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Cannot colocate journalnode and datanode on %s",
-          offer.getHostname()));
-      } else {
-        launch = true;
-      }
-    } else if (deadJournalNodes.contains(offer.getHostname())) {
-      launch = true;
-    }
-    if (launch) {
-      return launchNode(
-        driver,
-        offer,
-        HDFSConstants.JOURNAL_NODE_ID,
-        Arrays.asList(HDFSConstants.JOURNAL_NODE_ID),
-        HDFSConstants.NODE_EXECUTOR_ID);
-    }
-    return false;
-  }
-
-  private boolean tryToLaunchNameNode(SchedulerDriver driver, Offer offer) {
-    if (offerNotEnoughResources(offer,
-      (config.getNameNodeCpus() + config.getZkfcCpus()),
-      (config.getNameNodeHeapSize() + config.getZkfcHeapSize()))) {
-      log.info("Offer does not have enough resources");
-      return false;
-    }
-
-    boolean launch = false;
-    List<String> deadNameNodes = persistenceStore.getDeadNameNodes();
-
-    if (deadNameNodes.isEmpty()) {
-      if (persistenceStore.getNameNodes().size() == HDFSConstants.TOTAL_NAME_NODES) {
-        log.info(String.format("Already running %s namenodes", HDFSConstants.TOTAL_NAME_NODES));
-      } else if (persistenceStore.nameNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Already running namenode on %s", offer.getHostname()));
-      } else if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Cannot colocate namenode and datanode on %s", offer.getHostname()));
-      } else if (!persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("We need to coloate the namenode with a journalnode and there is"
-          + "no journalnode running on this host. %s", offer.getHostname()));
-      } else {
-        launch = true;
-      }
-    } else if (deadNameNodes.contains(offer.getHostname())) {
-      launch = true;
-    }
-    if (launch) {
-      return launchNode(
-        driver,
-        offer,
-        HDFSConstants.NAME_NODE_ID,
-        Arrays.asList(HDFSConstants.NAME_NODE_ID, HDFSConstants.ZKFC_NODE_ID),
-        HDFSConstants.NAME_NODE_EXECUTOR_ID);
-    }
-    return false;
-  }
-
-  private boolean tryToLaunchDataNode(SchedulerDriver driver, Offer offer) {
-    if (offerNotEnoughResources(offer, config.getDataNodeCpus(),
-      config.getDataNodeHeapSize())) {
-      log.info("Offer does not have enough resources");
-      return false;
-    }
-
-    boolean launch = false;
-    List<String> deadDataNodes = persistenceStore.getDeadDataNodes();
-    // TODO (elingg) Relax this constraint to only wait for DN's when the number of DN's is small
-    // What number of DN's should we try to recover or should we remove this constraint
-    // entirely?
-    if (deadDataNodes.isEmpty()) {
-      if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())
-        || persistenceStore.nameNodeRunningOnSlave(offer.getHostname())
-        || persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Already running hdfs task on %s", offer.getHostname()));
-      } else {
-        launch = true;
-      }
-    } else if (deadDataNodes.contains(offer.getHostname())) {
-      launch = true;
-    }
-    if (launch) {
-      return launchNode(
-        driver,
-        offer,
-        HDFSConstants.DATA_NODE_ID,
-        Arrays.asList(HDFSConstants.DATA_NODE_ID),
-        HDFSConstants.NODE_EXECUTOR_ID);
-    }
-    return false;
   }
 
   public void sendMessageTo(SchedulerDriver driver, TaskID taskId,
@@ -663,22 +384,6 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     } else {
       liveState.transitionTo(AcquisitionPhase.DATA_NODES);
     }
-  }
-
-  private boolean offerNotEnoughResources(Offer offer, double cpus, int mem) {
-    for (Resource offerResource : offer.getResourcesList()) {
-      if (offerResource.getName().equals("cpus") &&
-        cpus + config.getExecutorCpus() > offerResource.getScalar().getValue()) {
-        return true;
-      }
-      if (offerResource.getName().equals("mem") &&
-        (mem * config.getJvmOverhead())
-          + (config.getExecutorHeap() * config.getJvmOverhead())
-          > offerResource.getScalar().getValue()) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private void reconcile(SchedulerDriver driver) {
