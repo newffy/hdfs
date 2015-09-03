@@ -331,10 +331,13 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
 
     String taskIdName = String.format("%s.%s.%d", nodeName, executorName,
       System.currentTimeMillis());
+
     ExecutorInfo executorInfo = createExecutor(taskIdName, nodeName, executorName);
+    PortIterator iter = new PortIterator(offer);
+
     List<TaskInfo> tasks = new ArrayList<>();
     for (String taskType : taskTypes) {
-      List<Resource> taskResources = getTaskResources(taskType, offer);
+      List<Resource> taskResources = getTaskResources(taskType, iter);
       String taskName = getNextTaskName(taskType);
 
       TaskID taskId = TaskID.newBuilder()
@@ -475,7 +478,7 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
         .build());
   }
 
-  private List<Resource> getTaskResources(String taskName, Offer offer) {
+  private List<Resource> getTaskResources(String taskName, PortIterator iter) {
     double cpu = config.getTaskCpus(taskName);
     double mem = config.getTaskHeapSize(taskName) * config.getJvmOverhead();
 
@@ -484,7 +487,7 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     resources.add(resourceFactory.createMemResource(mem));
 
     try {
-      resources.addAll(getPortResources(taskName, offer));
+      resources.addAll(getPortResources(taskName, iter));
     } catch (Exception ex) {
       log.error(String.format("Failed to add port resources with exception: %s", ex));
     }
@@ -492,9 +495,9 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     return resources;
   }
 
-  private List<Resource> getPortResources(String taskType, Offer offer) throws Exception {
+  private List<Resource> getPortResources(String taskType, PortIterator iter) throws Exception {
     List<Resource> resources = new ArrayList<Resource>();
-    for (NamedPort port : config.getTaskPorts(taskType, new PortIterator(offer))) {
+    for (NamedPort port : config.getTaskPorts(taskType, iter)) {
       resources.add(resourceFactory.createPortResource(port.getPort(), port.getPort()));
     }
 
