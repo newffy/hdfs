@@ -27,7 +27,6 @@ import java.util.List;
 public abstract class HdfsNode {
   protected final Log log = LogFactory.getLog(HdfsNode.class);
   protected final HdfsFrameworkConfig config;
-  protected String executorName = HDFSConstants.NODE_EXECUTOR_ID;
   protected final IPersistentStateStore persistenceStore;
 
   private final LiveState liveState;

@@ -16,6 +16,7 @@ import java.util.List;
 public class NameNode extends HdfsNode implements INodeLauncher {
   private String name = HDFSConstants.NAME_NODE_ID;
   private List<String> taskTypes = Arrays.asList(HDFSConstants.NAME_NODE_ID, HDFSConstants.ZKFC_NODE_ID);
+  private String executorName = HDFSConstants.NAME_NODE_EXECUTOR_ID;
 
   public NameNode(LiveState liveState, IPersistentStateStore persistentStore, HdfsFrameworkConfig config) {
     super(liveState, persistentStore, config);

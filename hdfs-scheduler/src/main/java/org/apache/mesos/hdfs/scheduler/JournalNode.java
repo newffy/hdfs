@@ -16,6 +16,7 @@ import java.util.List;
 public class JournalNode extends HdfsNode implements INodeLauncher {
   private String name = HDFSConstants.JOURNAL_NODE_ID;
   private List<String> taskTypes = Arrays.asList(HDFSConstants.JOURNAL_NODE_ID);
+  private String executorName = HDFSConstants.NODE_EXECUTOR_ID;
 
   public JournalNode(LiveState liveState, IPersistentStateStore persistentStore, HdfsFrameworkConfig config) {
     super(liveState, persistentStore, config);
