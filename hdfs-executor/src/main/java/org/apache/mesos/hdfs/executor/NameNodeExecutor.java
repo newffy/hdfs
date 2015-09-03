@@ -23,8 +23,6 @@ import java.nio.charset.Charset;
  * The executor for the Primary Name Node Machine.
  */
 public class NameNodeExecutor extends AbstractNodeExecutor {
-  private final Log log = LogFactory.getLog(NameNodeExecutor.class);
-
   private Task nameNodeTask;
   // TODO (elingg) better handling in livestate and persistent state of zkfc task. Right now they are
   // chained.
@@ -111,6 +109,9 @@ public class NameNodeExecutor extends AbstractNodeExecutor {
   public void frameworkMessage(ExecutorDriver driver, byte[] msg) {
     super.frameworkMessage(driver, msg);
     String messageStr = new String(msg, Charset.defaultCharset());
+
+    log.info(String.format("Received framework message: %s", messageStr));
+
     File nameDir = new File(hdfsFrameworkConfig.getDataDir() + "/name");
     if (messageStr.equals(HDFSConstants.NAME_NODE_INIT_MESSAGE)
         || messageStr.equals(HDFSConstants.NAME_NODE_BOOTSTRAP_MESSAGE)) {

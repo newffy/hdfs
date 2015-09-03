@@ -38,7 +38,7 @@ import java.nio.file.Paths;
  */
 public abstract class AbstractNodeExecutor implements Executor {
 
-  private final Log log = LogFactory.getLog(AbstractNodeExecutor.class);
+  protected final Log log = LogFactory.getLog(AbstractNodeExecutor.class);
   protected ExecutorInfo executorInfo;
   protected HdfsFrameworkConfig hdfsFrameworkConfig;
 
@@ -183,6 +183,7 @@ public abstract class AbstractNodeExecutor implements Executor {
    * Starts a task's process so it goes into running state.
    */
   protected void startProcess(ExecutorDriver driver, Task task) {
+    log.info(String.format("Starting process: %s", task.getCmd()));
     reloadConfig();
     if (task.getProcess() == null) {
       try {
