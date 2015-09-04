@@ -6,8 +6,8 @@ import org.apache.mesos.SchedulerDriver;
 import java.util.List;
 
 /**
- * INodeLauncher.
+ * ILauncher.
  */
-public interface INodeLauncher {
-  public boolean launch(SchedulerDriver driver, Offer offer);
+public interface ILauncher {
+  public void launch(SchedulerDriver driver, Offer offer);
 }

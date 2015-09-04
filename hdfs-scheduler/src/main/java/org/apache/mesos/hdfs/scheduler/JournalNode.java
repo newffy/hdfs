@@ -13,50 +13,46 @@ import java.util.List;
 /**
  * HDFS Mesos Framework Scheduler class implementation.
  */
-public class JournalNode extends HdfsNode implements INodeLauncher {
-  private String name = HDFSConstants.JOURNAL_NODE_ID;
+public class JournalNode extends HdfsNode {
   private List<String> taskTypes = Arrays.asList(HDFSConstants.JOURNAL_NODE_ID);
   private String executorName = HDFSConstants.NODE_EXECUTOR_ID;
 
   public JournalNode(LiveState liveState, IPersistentStateStore persistentStore, HdfsFrameworkConfig config) {
-    super(liveState, persistentStore, config);
+    super(liveState, persistentStore, config, HDFSConstants.JOURNAL_NODE_ID);
   }
 
-  public boolean launch(SchedulerDriver driver, Offer offer) {
+
+  public boolean evaluate(Offer offer) {
+    boolean accept = false;
+
     if (offerNotEnoughResources(offer, config.getJournalNodeCpus(),
           config.getJournalNodeHeapSize())) {
       log.info("Offer does not have enough resources");
-      return false;
-    }
+    } else {
+      List<String> deadJournalNodes = persistenceStore.getDeadJournalNodes();
 
-    boolean launch = false;
-    List<String> deadJournalNodes = persistenceStore.getDeadJournalNodes();
+      log.info(deadJournalNodes);
 
-    log.info(deadJournalNodes);
-
-    if (deadJournalNodes.isEmpty()) {
-      if (persistenceStore.getJournalNodes().size() == config.getJournalNodeCount()) {
-        log.info(String.format("Already running %s journalnodes", config.getJournalNodeCount()));
-      } else if (persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Already running journalnode on %s", offer.getHostname()));
-      } else if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Cannot colocate journalnode and datanode on %s",
-              offer.getHostname()));
-      } else {
-        launch = true;
+      if (deadJournalNodes.isEmpty()) {
+        if (persistenceStore.getJournalNodes().size() == config.getJournalNodeCount()) {
+          log.info(String.format("Already running %s journalnodes", config.getJournalNodeCount()));
+        } else if (persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
+          log.info(String.format("Already running journalnode on %s", offer.getHostname()));
+        } else if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())) {
+          log.info(String.format("Cannot colocate journalnode and datanode on %s",
+                offer.getHostname()));
+        } else {
+          accept = true;
+        }
+      } else if (deadJournalNodes.contains(offer.getHostname())) {
+        accept = true;
       }
-    } else if (deadJournalNodes.contains(offer.getHostname())) {
-      launch = true;
     }
 
-    if (launch) {
-      return launch(
-        driver,
-        offer,
-        name,
-        taskTypes,
-        executorName);
-    }
-    return false;
+    return accept;
+  }
+
+  public void launch(SchedulerDriver driver, Offer offer) {
+    launch(driver, offer, name, taskTypes, executorName);
   }
 }

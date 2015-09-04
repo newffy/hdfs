@@ -24,30 +24,35 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-public abstract class HdfsNode {
+public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
   protected final Log log = LogFactory.getLog(HdfsNode.class);
   protected final HdfsFrameworkConfig config;
   protected final IPersistentStateStore persistenceStore;
+  protected final String name;
 
   private final LiveState liveState;
   private final ResourceFactory resourceFactory;
 
-  public HdfsNode(LiveState liveState, IPersistentStateStore persistentStore, HdfsFrameworkConfig config) {
+  public HdfsNode(LiveState liveState, IPersistentStateStore persistentStore, HdfsFrameworkConfig config, String name) {
     this.liveState = liveState;
     this.persistenceStore = persistentStore;
     this.config = config;
+    this.name = name;
     this.resourceFactory = new ResourceFactory(config.getHdfsRole());
   }
 
-  protected boolean launch(SchedulerDriver driver, Offer offer,
-      String nodeName, List<String> taskTypes, String executorName) {
-    List<TaskInfo> tasks = getTasks(driver, offer, nodeName, taskTypes, executorName);
-    return launchNode(driver, offer, tasks);
+  public String getName() {
+    return name;
   }
 
-  private boolean launchNode(SchedulerDriver driver, Offer offer, List<TaskInfo> tasks) {
+  protected void launch(SchedulerDriver driver, Offer offer,
+      String nodeName, List<String> taskTypes, String executorName) {
+    List<TaskInfo> tasks = getTasks(driver, offer, nodeName, taskTypes, executorName);
+    launchNode(driver, offer, tasks);
+  }
+
+  private void launchNode(SchedulerDriver driver, Offer offer, List<TaskInfo> tasks) {
     driver.launchTasks(Arrays.asList(offer.getId()), tasks);
-    return true;
   }
 
   private List<TaskInfo> getTasks(SchedulerDriver driver, Offer offer,

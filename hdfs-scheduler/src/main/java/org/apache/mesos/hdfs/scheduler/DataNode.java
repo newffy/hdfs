@@ -13,48 +13,42 @@ import java.util.List;
 /**
  * HDFS Mesos Framework Scheduler class implementation.
  */
-public class DataNode extends HdfsNode implements INodeLauncher {
-  private String name = HDFSConstants.DATA_NODE_ID;
+public class DataNode extends HdfsNode {
   private List<String> taskTypes = Arrays.asList(HDFSConstants.DATA_NODE_ID);
   private String executorName = HDFSConstants.NODE_EXECUTOR_ID;
 
   public DataNode(LiveState liveState, IPersistentStateStore persistentStore, HdfsFrameworkConfig config) {
-    super(liveState, persistentStore, config);
+    super(liveState, persistentStore, config, HDFSConstants.DATA_NODE_ID);
   }
 
-  public boolean launch(SchedulerDriver driver, Offer offer) {
+  public boolean evaluate(Offer offer) {
+    boolean accept = false;
+
     if (offerNotEnoughResources(offer, config.getDataNodeCpus(),
           config.getDataNodeHeapSize())) {
       log.info("Offer does not have enough resources");
-      return false;
-    }
-
-    boolean launch = false;
-    List<String> deadDataNodes = persistenceStore.getDeadDataNodes();
-    // TODO (elingg) Relax this constraint to only wait for DN's when the number of DN's is small
-    // What number of DN's should we try to recover or should we remove this constraint
-    // entirely?
-    if (deadDataNodes.isEmpty()) {
-      if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())
-        || persistenceStore.nameNodeRunningOnSlave(offer.getHostname())
-        || persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
-        log.info(String.format("Already running hdfs task on %s", offer.getHostname()));
-      } else {
-        launch = true;
+    } else {
+      List<String> deadDataNodes = persistenceStore.getDeadDataNodes();
+      // TODO (elingg) Relax this constraint to only wait for DN's when the number of DN's is small
+      // What number of DN's should we try to recover or should we remove this constraint
+      // entirely?
+      if (deadDataNodes.isEmpty()) {
+        if (persistenceStore.dataNodeRunningOnSlave(offer.getHostname())
+            || persistenceStore.nameNodeRunningOnSlave(offer.getHostname())
+            || persistenceStore.journalNodeRunningOnSlave(offer.getHostname())) {
+          log.info(String.format("Already running hdfs task on %s", offer.getHostname()));
+        } else {
+          accept = true;
+        }
+      } else if (deadDataNodes.contains(offer.getHostname())) {
+        accept = true;
       }
-    } else if (deadDataNodes.contains(offer.getHostname())) {
-      launch = true;
     }
 
-    if (launch) {
-      return launch(
-        driver,
-        offer,
-        name,
-        taskTypes,
-        executorName);
-    }
+    return accept;
+  }
 
-    return false;
+  public void launch(SchedulerDriver driver, Offer offer) {
+    launch(driver, offer, name, taskTypes, executorName);
   }
 }

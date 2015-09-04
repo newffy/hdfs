@@ -58,6 +58,7 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
   private final DnsResolver dnsResolver;
   private final Reconciler reconciler;
   private final ResourceFactory resourceFactory;
+  private final NodeLauncher nodeLauncher;
 
   @Inject
   public HdfsScheduler(HdfsFrameworkConfig config,
@@ -69,6 +70,7 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     this.dnsResolver = new DnsResolver(this, config);
     this.reconciler = new Reconciler(config, persistenceStore);
     this.resourceFactory = new ResourceFactory(config.getHdfsRole());
+    this.nodeLauncher = new NodeLauncher();
 
     addObserver(reconciler);
   }
@@ -204,9 +206,17 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     }
   }
 
+  private void logOffers(List<Offer> offers) {
+    log.info(String.format("Received %d offers", offers.size()));
+
+    for (Offer offer : offers) {
+      log.info(String.format("%s", offer));
+    }
+  }
+
   @Override
   public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
-    log.info(String.format("Received %d offers", offers.size()));
+    logOffers(offers);
 
     if (liveState.getCurrentAcquisitionPhase() == AcquisitionPhase.RECONCILING_TASKS && reconciler.complete()) {
       correctCurrentPhase();
@@ -214,10 +224,6 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
 
     // TODO (elingg) within each phase, accept offers based on the number of nodes you need
     boolean acceptedOffer = false;
-    boolean journalNodesResolvable = false;
-    if (liveState.getCurrentAcquisitionPhase() == AcquisitionPhase.START_NAME_NODES) {
-      journalNodesResolvable = dnsResolver.journalNodesResolvable();
-    }
     for (Offer offer : offers) {
       if (acceptedOffer) {
         driver.declineOffer(offer.getId());
@@ -229,32 +235,18 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
             break;
           case JOURNAL_NODES:
             JournalNode jn = new JournalNode(liveState, persistenceStore, config);
-            if (jn.launch(driver, offer)) {
-              acceptedOffer = true;
-            } else {
-              driver.declineOffer(offer.getId());
-            }
+            acceptedOffer = nodeLauncher.launch(driver, jn, offer);
             break;
           case START_NAME_NODES:
-            if (journalNodesResolvable) {
-              NameNode nn = new NameNode(liveState, persistenceStore, config);
-              if (nn.launch(driver, offer)) {
-                acceptedOffer = true;
-              }
-            } else {
-              driver.declineOffer(offer.getId());
-            }
+            NameNode nn = new NameNode(liveState, persistenceStore, dnsResolver, config);
+            acceptedOffer = nodeLauncher.launch(driver, nn, offer);
             break;
           case FORMAT_NAME_NODES:
             driver.declineOffer(offer.getId());
             break;
           case DATA_NODES:
             DataNode dn = new DataNode(liveState, persistenceStore, config);
-            if (dn.launch(driver, offer)) {
-              acceptedOffer = true;
-            } else {
-              driver.declineOffer(offer.getId());
-            }
+            acceptedOffer = nodeLauncher.launch(driver, dn, offer);
             break;
         }
       }
