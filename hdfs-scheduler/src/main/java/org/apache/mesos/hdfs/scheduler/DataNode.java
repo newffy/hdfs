@@ -24,7 +24,11 @@ public class DataNode extends HdfsNode {
   public boolean evaluate(Offer offer) {
     boolean accept = false;
 
-    if (!offeredEnoughResources(offer, config.getDataNodeCpus(), config.getDataNodeHeapSize(), config.getDataNodePorts())) {
+    if (!offeredEnoughResources(
+          offer,
+          config.getDataNodeCpus(),
+          config.getDataNodeHeapSize(),
+          config.getDataNodePorts())) {
       log.info("Offer does not have enough resources");
     } else {
       List<String> deadDataNodes = persistenceStore.getDeadDataNodes();

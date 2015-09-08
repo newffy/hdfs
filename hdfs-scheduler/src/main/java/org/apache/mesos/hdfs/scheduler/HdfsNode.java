@@ -15,7 +15,6 @@ import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.Value.Range;
-import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.SchedulerDriver;
 
 import java.util.ArrayList;
@@ -239,6 +238,8 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     boolean portsAvailable = false;
 
     for (Resource resource : offer.getResourcesList()) {
+      log.info(String.format("Resource: %s", resource));
+
       if (resource.getName().equals("cpus") && !enoughCpu) {
         enoughCpu = enoughCpu(resource, cpus);
       }
@@ -251,6 +252,10 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
         portsAvailable = portsAvailable(resource, ports);
       }
     }
+
+    log.info(String.format("Enough cpu: %s", enoughCpu));
+    log.info(String.format("Enough mem: %s", enoughMem));
+    log.info(String.format("Ports available: %s", portsAvailable));
 
     return enoughCpu && enoughMem && portsAvailable;
   }
