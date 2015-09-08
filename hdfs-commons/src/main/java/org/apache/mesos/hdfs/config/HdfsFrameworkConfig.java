@@ -8,6 +8,8 @@ import org.apache.hadoop.fs.Path;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
 
 /**
@@ -29,6 +31,18 @@ public class HdfsFrameworkConfig {
   private static final double DEFAULT_NAMENODE_CPUS = 1;
   private static final double DEFAULT_JOURNAL_CPUS = 1;
   private static final double DEFAULT_DATANODE_CPUS = 1;
+
+  private static final long DEFAULT_NAMENODE_HTTP_PORT = 50070;
+  private static final long DEFAULT_NAMENODE_SECONDARY_HTTP_PORT = 50090;
+  private static final long DEFAULT_NAMENODE_RPC_PORT = 50071;
+  private static final long DEFAULT_NAMENODE_IPC_PORT = 8020;
+
+  private static final long DEFAULT_DATANODE_HTTP_PORT = 50075;
+  private static final long DEFAULT_DATANODE_DFS_PORT = 50010;
+  private static final long DEFAULT_DATANODE_IPC_PORT = 50020;
+
+  private static final long DEFAULT_JOURNALNODE_PORT = 8485;
+  private static final long DEFAULT_ZOOKEEPER_PORT = 2181;
 
   private static final double DEFAULT_JVM_OVERHEAD = 1.35;
   private static final int DEFAULT_JOURNAL_NODE_COUNT = 3;
@@ -207,6 +221,87 @@ public class HdfsFrameworkConfig {
         throw new ConfigurationException(msg);
     }
     return cpus;
+  }
+
+  // Name node ports
+  public long getNameNodeHttpPort() {
+    return getConf().getLong("mesos.hdfs.namenode.http.port", DEFAULT_NAMENODE_HTTP_PORT);
+  }
+
+  public long getNameNodeSecondaryHttpPort() {
+    return getConf().getLong("mesos.hdfs.namenode.secondary.http.port", DEFAULT_NAMENODE_SECONDARY_HTTP_PORT);
+  }
+
+  public long getNameNodeIpcPort() {
+    return getConf().getLong("mesos.hdfs.namenode.ipc.port", DEFAULT_NAMENODE_IPC_PORT);
+  }
+
+  public long getNameNodeRpcPort() {
+    return getConf().getLong("mesos.hdfs.namenode.rpc.port", DEFAULT_NAMENODE_RPC_PORT);
+  }
+
+  public List<Long> getNameNodePorts() {
+    return Arrays.asList(
+        getNameNodeHttpPort(),
+        getNameNodeSecondaryHttpPort(),
+        getNameNodeIpcPort(),
+        getNameNodeIpcPort());
+  }
+
+  // Data node ports
+  public long getDataNodeHttpPort() {
+    return getConf().getLong("mesos.hdfs.datanode.http.port", DEFAULT_DATANODE_HTTP_PORT);
+  }
+
+  public long getDataNodeDfsPort() {
+    return getConf().getLong("mesos.hdfs.datanode.dfs.port", DEFAULT_DATANODE_DFS_PORT);
+  }
+
+  public long getDataNodeIpcPort() {
+    return getConf().getLong("mesos.hdfs.datanode.ipc.port", DEFAULT_DATANODE_IPC_PORT);
+  }
+
+  public List<Long> getDataNodePorts() {
+    return Arrays.asList(
+        getDataNodeHttpPort(),
+        getDataNodeDfsPort(),
+        getDataNodeIpcPort());
+  }
+
+  // Journal node ports
+  public long getJournalNodePort() {
+    return getConf().getLong("mesos.hdfs.journalnode.port", DEFAULT_JOURNALNODE_PORT);
+  }
+
+  public List<Long> getJournalNodePorts() {
+    return Arrays.asList(getJournalNodePort());
+  }
+
+  // Zookeeper ports
+  public long getZookeeperPort() {
+    return getConf().getLong("mesos.hdfs.zookeeper.port", DEFAULT_ZOOKEEPER_PORT);
+  }
+
+  public List<Long> getZookeeperPorts() {
+    return Arrays.asList(getZookeeperPort());
+  }
+
+  public List<Long> getTaskPorts(String taskType) {
+    switch (taskType) {
+      case "zkfc":
+        return getZookeeperPorts();
+      case "namenode":
+        return getNameNodePorts();
+      case "datanode":
+        return getDataNodePorts();
+      case "journalnode":
+        return getJournalNodePorts();
+      default:
+        final String msg = "Invalid request for ports for taskName: " + taskType;
+        log.error(msg);
+        throw new ConfigurationException(msg);
+    }
+
   }
 
   public int getJournalNodeCount() {

@@ -14,6 +14,8 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Protos.Value.Range;
+import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.SchedulerDriver;
 
 import java.util.ArrayList;
@@ -140,13 +142,18 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
       .build();
   }
 
-  private List<Resource> getTaskResources(String taskType) {
+  private List<Resource> createTaskResources(String taskType) {
     double cpu = config.getTaskCpus(taskType);
     double mem = config.getTaskHeapSize(taskType) * config.getJvmOverhead();
+    List<Long> ports = config.getTaskPorts(taskType);
 
     List<Resource> resources = new ArrayList<Resource>();
     resources.add(resourceFactory.createCpuResource(cpu));
     resources.add(resourceFactory.createMemResource(mem));
+
+    for (Long port : ports) {
+      resources.add(resourceFactory.createPortResource(port));
+    }
 
     return resources;
   }
@@ -192,22 +199,60 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
       resourceFactory.createMemResource(mem));
   }
 
-  protected boolean offerNotEnoughResources(Offer offer, double cpus, int mem) {
-    for (Resource offerResource : offer.getResourcesList()) {
-      if (offerResource.getName().equals("cpus") &&
-        cpus + config.getExecutorCpus() > offerResource.getScalar().getValue()) {
-        return true;
-      }
+  private boolean enoughCpu(Resource resource, double cpu) {
+    return cpu + config.getExecutorCpus() < resource.getScalar().getValue();
+  }
 
-      if (offerResource.getName().equals("mem") &&
-        (mem * config.getJvmOverhead())
-          + (config.getExecutorHeap() * config.getJvmOverhead())
-          > offerResource.getScalar().getValue()) {
+  private boolean enoughMem(Resource resource, double mem) {
+    double taskMem = mem * config.getJvmOverhead();
+    double execMem = config.getExecutorHeap() * config.getJvmOverhead();
+    return taskMem + execMem < resource.getScalar().getValue();
+  }
+
+  private boolean portsAvailable(Resource resource, List<Long> ports) {
+    if (resource.getRanges() == null) {
+      return false;
+    } else {
+      for (Long port : ports) {
+        if (!portAvailable(resource.getRanges().getRangeList(), port)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  private boolean portAvailable(List<Range> ranges, Long port) {
+    for (Range range : ranges) {
+      if (port >= range.getBegin() && port <= range.getEnd()) {
         return true;
       }
     }
 
     return false;
+  }
+
+  protected boolean offeredEnoughResources(Offer offer, double cpus, int mem, List<Long> ports) {
+    boolean enoughCpu = false;
+    boolean enoughMem = false;
+    boolean portsAvailable = false;
+
+    for (Resource resource : offer.getResourcesList()) {
+      if (resource.getName().equals("cpus") && !enoughCpu) {
+        enoughCpu = enoughCpu(resource, cpus);
+      }
+
+      if (resource.getName().equals("mem") && !enoughMem) {
+        enoughMem = enoughMem(resource, mem);
+      }
+
+      if (resource.getName().equals("ports") && !portsAvailable) {
+        portsAvailable = portsAvailable(resource, ports);
+      }
+    }
+
+    return enoughCpu && enoughMem && portsAvailable;
   }
 
   protected List<Task> createTasks(Offer offer) {
@@ -216,7 +261,7 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     List<Task> tasks = new ArrayList<Task>();
 
     for (String type : getTaskTypes()) {
-      List<Resource> resources = getTaskResources(type);
+      List<Resource> resources = createTaskResources(type);
       ExecutorInfo execInfo = createExecutor(taskIdName, name, executorName);
       String taskName = getNextTaskName(type);
 

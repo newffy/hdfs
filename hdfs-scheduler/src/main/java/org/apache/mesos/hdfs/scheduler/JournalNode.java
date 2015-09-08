@@ -24,7 +24,7 @@ public class JournalNode extends HdfsNode {
   public boolean evaluate(Offer offer) {
     boolean accept = false;
 
-    if (offerNotEnoughResources(offer, config.getJournalNodeCpus(), config.getJournalNodeHeapSize())) {
+    if (!offeredEnoughResources(offer, config.getJournalNodeCpus(), config.getJournalNodeHeapSize(), config.getJournalNodePorts())) {
       log.info("Offer does not have enough resources");
     } else {
       List<String> deadJournalNodes = persistenceStore.getDeadJournalNodes();

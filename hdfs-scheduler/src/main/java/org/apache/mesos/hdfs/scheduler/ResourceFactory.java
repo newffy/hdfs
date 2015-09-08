@@ -21,6 +21,10 @@ public class ResourceFactory {
     return createScalarResource("mem", value);
   }
 
+  public Resource createPortResource(long port) {
+    return createPortResource(port, port);
+  }
+
   public Resource createPortResource(long begin, long end) {
     return createRangeResource("ports", begin, end);
   }
