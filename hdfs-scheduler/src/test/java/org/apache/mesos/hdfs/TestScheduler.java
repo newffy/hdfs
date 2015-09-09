@@ -3,6 +3,8 @@ package org.apache.mesos.hdfs;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.mesos.Protos;
+import org.apache.mesos.Protos.Value.Range;
+import org.apache.mesos.Protos.Value.Ranges;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.hdfs.config.HdfsFrameworkConfig;
 import org.apache.mesos.hdfs.scheduler.HdfsScheduler;
@@ -139,7 +141,7 @@ public class TestScheduler {
     when(liveState.getCurrentAcquisitionPhase()).thenReturn(AcquisitionPhase.JOURNAL_NODES);
 
     scheduler.resourceOffers(driver,
-        Lists.newArrayList(createTestOfferWithResources(0, 2, 2048)));
+        Lists.newArrayList(createTestOfferWithResources(0, 2, 2048, 8000, 9000)));
 
     verify(driver, times(1)).launchTasks(anyList(), taskInfosCapture.capture());
     assertEquals(1, taskInfosCapture.getValue().size());
@@ -229,7 +231,7 @@ public class TestScheduler {
   @Test
   public void declinesOffersWithNotEnoughResources() {
     when(liveState.getCurrentAcquisitionPhase()).thenReturn(AcquisitionPhase.DATA_NODES);
-    Protos.Offer offer = createTestOfferWithResources(0, 0.1, 64);
+    Protos.Offer offer = createTestOfferWithResources(0, 0.1, 64, 0, 0);
 
     scheduler.resourceOffers(driver, Lists.newArrayList(offer));
 
@@ -267,7 +269,7 @@ public class TestScheduler {
         .build();
   }
 
-  private Protos.Offer createTestOfferWithResources(int instanceNumber, double cpus, int mem) {
+  private Protos.Offer createTestOfferWithResources(int instanceNumber, double cpus, int mem, int portBegin, int portEnd) {
     return Protos.Offer.newBuilder()
         .setId(createTestOfferId(instanceNumber))
         .setFrameworkId(Protos.FrameworkID.newBuilder().setValue("framework1").build())
@@ -286,6 +288,15 @@ public class TestScheduler {
                 .setType(Protos.Value.Type.SCALAR)
                 .setScalar(Protos.Value.Scalar.newBuilder()
                     .setValue(mem).build())
+                .setRole("*")
+                .build(),
+            Protos.Resource.newBuilder()
+                .setName("ports")
+                .setType(Protos.Value.Type.RANGES)
+                .setRanges(Ranges.newBuilder()
+                  .addRange(Range.newBuilder()
+                    .setBegin(portBegin)
+                    .setEnd(portEnd)))
                 .setRole("*")
                 .build()))
         .build();
