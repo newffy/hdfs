@@ -168,7 +168,7 @@ public class TestScheduler {
     when(persistenceStore.journalNodeRunningOnSlave("host0")).thenReturn(true);
     when(dnsResolver.journalNodesResolvable()).thenReturn(true);
 
-    scheduler.resourceOffers(driver, Lists.newArrayList(createTestOffer(0)));
+    scheduler.resourceOffers(driver, Lists.newArrayList(createTestOfferWithResources(0, 2, 100000, 0, 100000)));
 
     verify(driver, times(1)).launchTasks(anyList(), taskInfosCapture.capture());
     assertTrue(taskInfosCapture.getValue().size() == 2);
@@ -187,11 +187,11 @@ public class TestScheduler {
 
     scheduler.resourceOffers(driver,
         Lists.newArrayList(
-            createTestOffer(0),
-            createTestOffer(1),
-            createTestOffer(2),
-            createTestOffer(3)
-            ));
+          createTestOfferWithResources(0, 2, 100000, 0, 100000),
+          createTestOfferWithResources(1, 2, 100000, 0, 100000),
+          createTestOfferWithResources(2, 2, 100000, 0, 100000),
+          createTestOfferWithResources(3, 2, 100000, 0, 100000)
+          ));
 
     verify(driver, times(3)).declineOffer(any(Protos.OfferID.class));
   }
@@ -202,8 +202,8 @@ public class TestScheduler {
 
     scheduler.resourceOffers(driver,
         Lists.newArrayList(
-            createTestOffer(0)
-            )
+          createTestOfferWithResources(0, 2, 100000, 0, 200000)
+          )
         );
 
     verify(driver, times(1)).launchTasks(anyList(), taskInfosCapture.capture());
@@ -231,7 +231,7 @@ public class TestScheduler {
   @Test
   public void declinesOffersWithNotEnoughResources() {
     when(liveState.getCurrentAcquisitionPhase()).thenReturn(AcquisitionPhase.DATA_NODES);
-    Protos.Offer offer = createTestOfferWithResources(0, 0.1, 64, 0, 0);
+    Protos.Offer offer = createTestOfferWithResources(0, 0.1, 64, 0, 100000);
 
     scheduler.resourceOffers(driver, Lists.newArrayList(offer));
 

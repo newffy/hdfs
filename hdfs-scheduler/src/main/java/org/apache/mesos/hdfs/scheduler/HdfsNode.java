@@ -199,21 +199,32 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
   }
 
   private boolean enoughCpu(Resource resource, double cpu) {
-    return cpu + config.getExecutorCpus() < resource.getScalar().getValue();
+    double neededCpu = cpu + config.getExecutorCpus();
+    double availableCpu = resource.getScalar().getValue();
+    log.info(String.format("Needed CPU: %s, Available CPU: %s", neededCpu, availableCpu));
+    return neededCpu <= availableCpu;
   }
 
   private boolean enoughMem(Resource resource, double mem) {
     double taskMem = mem * config.getJvmOverhead();
     double execMem = config.getExecutorHeap() * config.getJvmOverhead();
-    return taskMem + execMem < resource.getScalar().getValue();
+    double neededMem = taskMem + execMem;
+    double availableMem = resource.getScalar().getValue();
+    log.info(String.format("Needed MEM: %s, Available MEM: %s", neededMem, availableMem));
+    return neededMem <= availableMem;
   }
 
   private boolean portsAvailable(Resource resource, List<Long> ports) {
+    List<Range> portRanges = resource.getRanges().getRangeList();
+
+    log.info(String.format("Needed PORTS: %s", ports));
+    logPortRanges(portRanges);
+
     if (resource.getRanges() == null) {
       return false;
     } else {
       for (Long port : ports) {
-        if (!portAvailable(resource.getRanges().getRangeList(), port)) {
+        if (!portAvailable(portRanges, port)) {
           return false;
         }
       }
@@ -224,12 +235,22 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
 
   private boolean portAvailable(List<Range> ranges, Long port) {
     for (Range range : ranges) {
-      if (port >= range.getBegin() && port <= range.getEnd()) {
+      long portBegin = range.getBegin();
+      long portEnd = range.getEnd();
+      if (port >= portBegin && port <= portEnd) {
         return true;
       }
     }
 
     return false;
+  }
+
+  private void logPortRanges(List<Range> ranges) {
+    for (Range range : ranges) {
+      long portBegin = range.getBegin();
+      long portEnd = range.getEnd();
+      log.info(String.format("Available PORTS: [%s - %s]", portBegin, portEnd));
+    }
   }
 
   protected boolean offeredEnoughResources(Offer offer, double cpus, int mem, List<Long> ports) {
