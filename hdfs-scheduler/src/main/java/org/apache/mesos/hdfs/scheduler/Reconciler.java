@@ -1,9 +1,11 @@
 package org.apache.mesos.hdfs.scheduler;
 
+import com.google.inject.Inject;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mesos.hdfs.config.HdfsFrameworkConfig;
-import org.apache.mesos.hdfs.state.IPersistentStateStore;
+import org.apache.mesos.hdfs.state.HdfsState;
 import org.apache.mesos.hdfs.util.HDFSConstants;
 import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
@@ -11,6 +13,7 @@ import org.apache.mesos.Protos;
 import org.apache.mesos.SchedulerDriver;
 
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -25,17 +28,18 @@ public class Reconciler implements Observer {
   private final Log log = LogFactory.getLog(HdfsScheduler.class);
 
   private HdfsFrameworkConfig config;
-  private IPersistentStateStore store;
+  private HdfsState state;
   private Set<String> pendingTasks;
 
-  public Reconciler(HdfsFrameworkConfig config, IPersistentStateStore pStore) {
+  @Inject
+  public Reconciler(HdfsFrameworkConfig config, HdfsState state) {
     this.config = config;
-    this.store = pStore;
+    this.state = state;
     this.pendingTasks = new HashSet<String>();
   }
 
-  public void reconcile(SchedulerDriver driver) {
-    pendingTasks = store.getAllTaskIds();
+  public void reconcile(SchedulerDriver driver) throws InterruptedException, ExecutionException {
+    pendingTasks = state.getTaskIds();
     (new ReconcileThread(this, driver)).start();
   }
 

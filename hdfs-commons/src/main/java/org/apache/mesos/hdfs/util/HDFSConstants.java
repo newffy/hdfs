@@ -5,6 +5,8 @@ package org.apache.mesos.hdfs.util;
  */
 public final class HDFSConstants {
 
+  private HDFSConstants() {}
+
   // Total number of NameNodes
   // Note: We do not currently support more or less than 2 NameNodes
   public static final Integer TOTAL_NAME_NODES = 2;
@@ -43,6 +45,18 @@ public final class HDFSConstants {
   public static final Integer ZKFC_NODE_PORT = 8019;
   public static final Integer NAME_NODE_PORT = 50070;
 
-  private HDFSConstants() {
-  }
+  // Exit codes
+  public static final Integer PROC_EXIT_CODE = 1;
+  public static final Integer RELOAD_EXIT_CODE = 2;
+  public static final Integer NAMENODE_EXIT_CODE = 3;
+  public static final Integer RECONCILE_EXIT_CODE = 4;
+
+  // NameNode initialization constants 
+  public static final String ZK_FRAMEWORK_ID_KEY = "FrameworkId";
+  public static final Integer ZK_MUTEX_ACQUIRE_TIMEOUT_SEC = 30;
+  public static final Integer CURATOR_MAX_RETRIES = 3;
+  public static final String NN_STATUS_KEY = "status";
+  public static final String NN_STATUS_INIT_VAL = "initialized";
+  public static final String NN_STATUS_UNINIT_VAL = "uninitialized";
+  public static final Integer POLL_DELAY_MS = 1000;
 }

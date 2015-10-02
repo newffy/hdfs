@@ -51,6 +51,16 @@ public class HdfsFrameworkConfig {
 
   private HashMap<String, NodeConfig> nodeConfigMap = new HashMap<>();
 
+  public HdfsFrameworkConfig() {
+    // The path is configurable via the mesos.conf.path system property
+    // so it can be changed when starting up the scheduler via bash
+    Properties props = System.getProperties();
+    Path configPath = new Path(props.getProperty("mesos.conf.path", "etc/hadoop/mesos-site.xml"));
+    Configuration configuration = new Configuration();
+    configuration.addResource(configPath);
+    setConf(configuration);
+  }
+
   public HdfsFrameworkConfig(Configuration conf) {
     setConf(conf);
   }
@@ -81,16 +91,6 @@ public class HdfsFrameworkConfig {
 
   public NodeConfig getNodeConfig(String nodeType) {
     return nodeConfigMap.get(nodeType);
-  }
-
-  public HdfsFrameworkConfig() {
-    // The path is configurable via the mesos.conf.path system property
-    // so it can be changed when starting up the scheduler via bash
-    Properties props = System.getProperties();
-    Path configPath = new Path(props.getProperty("mesos.conf.path", "etc/hadoop/mesos-site.xml"));
-    Configuration configuration = new Configuration();
-    configuration.addResource(configPath);
-    setConf(configuration);
   }
 
   public String getPrincipal() {
