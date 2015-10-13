@@ -128,7 +128,7 @@ public class HdfsScheduler extends Observable implements org.apache.mesos.Schedu
     log.info(String.format("Received %d offers", offers.size()));
 
     for (Offer offer : offers) {
-      log.info(String.format("%s", offer.getId()));
+      log.info(String.format("%s", offer));
     }
   }
 

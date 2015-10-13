@@ -6,7 +6,9 @@ import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Environment;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
+import org.apache.mesos.Protos.Filters;
 import org.apache.mesos.Protos.Offer;
+import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
@@ -53,12 +55,58 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
   public void launch(SchedulerDriver driver, Offer offer)
     throws ClassNotFoundException, IOException, InterruptedException, ExecutionException {
     List<Task> tasks = createTasks(offer);
-    List<TaskInfo> taskInfos = getTaskInfos(tasks);
 
     // The recording of Tasks is what can potentially throw the exceptions noted above.  This is good news
     // because we are guaranteed that we do not actually launch Tasks unless we have recorded them.
     recordTasks(tasks);
-    driver.launchTasks(Arrays.asList(offer.getId()), taskInfos);
+
+    List<OfferID> offerIds = getOfferIds(offer);
+    List<Offer.Operation> operations = getOperations(tasks);
+    Filters filters = getFilters();
+
+    driver.acceptOffers(offerIds, operations, filters);
+  }
+
+  private void reserveOffer(Scheduler driver, Offer offer) {
+
+  }
+
+  private List<OfferID> getOfferIds(Offer offer) {
+    List<OfferID> offerIds = new ArrayList<OfferID>();
+    offerIds.add(offer.getId());
+    return offerIds;
+  }
+
+  private List<Offer.Operation> getOperations(List<Task> tasks) {
+    Offer.Operation.Launch.Builder launch = getLaunchBuilder(tasks);
+    List<Offer.Operation> operations = new ArrayList<Offer.Operation>();
+
+    Offer.Operation operation = Offer.Operation.newBuilder()
+      .setType(Offer.Operation.Type.LAUNCH)
+      .setLaunch(launch)
+      .build();
+
+    operations.add(operation);
+    return operations;
+  }
+
+  private Offer.Operation.Reserve.Builder getReserveBuilder(Offer offer) {
+    List<Resource> resources 
+  }
+
+  private Offer.Operation.Launch.Builder getLaunchBuilder(List<Task> tasks) {
+    List<TaskInfo> taskInfos = getTaskInfos(tasks);
+
+    Offer.Operation.Launch.Builder launch = Offer.Operation.Launch.newBuilder();
+    for (TaskInfo info : taskInfos) {
+      launch.addTaskInfos(TaskInfo.newBuilder(info));
+    }
+
+    return launch;
+  }
+
+  private Filters getFilters() {
+    return Filters.newBuilder().setRefuseSeconds(1).build();
   }
 
   private List<TaskInfo> getTaskInfos(List<Task> tasks) {
