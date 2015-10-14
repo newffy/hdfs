@@ -34,6 +34,9 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
   protected final HdfsState state;
   protected final String name;
 
+  protected abstract String getExecutorName();
+  protected abstract List<String> getTaskTypes();
+
   public HdfsNode(
       HdfsState state,
       HdfsFrameworkConfig config,
@@ -48,10 +51,6 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     return name;
   }
 
-  protected abstract String getExecutorName();
-
-  protected abstract List<String> getTaskTypes();
-
   public void launch(SchedulerDriver driver, Offer offer)
     throws ClassNotFoundException, IOException, InterruptedException, ExecutionException {
     List<Task> tasks = createTasks(offer);
@@ -61,7 +60,7 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     recordTasks(tasks);
 
     List<OfferID> offerIds = getOfferIds(offer);
-    List<Offer.Operation> operations = getOperations(tasks);
+    List<Offer.Operation> operations = getLaunchOperations(tasks);
     Filters filters = getFilters();
 
     driver.acceptOffers(offerIds, operations, filters);
@@ -77,7 +76,7 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     return offerIds;
   }
 
-  private List<Offer.Operation> getOperations(List<Task> tasks) {
+  private List<Offer.Operation> getLaunchOperations(List<Task> tasks) {
     Offer.Operation.Launch.Builder launch = getLaunchBuilder(tasks);
     List<Offer.Operation> operations = new ArrayList<Offer.Operation>();
 
@@ -90,8 +89,7 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     return operations;
   }
 
-  private Offer.Operation.Reserve.Builder getReserveBuilder(Offer offer) {
-    List<Resource> resources 
+  private Offer.Operation createReserveOperation() {
   }
 
   private Offer.Operation.Launch.Builder getLaunchBuilder(List<Task> tasks) {
