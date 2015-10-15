@@ -80,13 +80,21 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
   private ExecutorInfo createExecutor(String taskIdName, String nodeName, String executorName) {
     int confServerPort = config.getConfigServerPort();
 
-    String cmd = "export JAVA_HOME=$MESOS_DIRECTORY/" + config.getJreVersion()
-      + " && env ; cd hdfs-mesos-* && "
-      + "exec `if [ -z \"$JAVA_HOME\" ]; then echo java; "
-      + "else echo $JAVA_HOME/bin/java; fi` "
-      + "$HADOOP_OPTS "
-      + "$EXECUTOR_OPTS "
-      + "-cp lib/*.jar org.apache.mesos.hdfs.executor." + executorName;
+//    String cmd = "export JAVA_HOME=$MESOS_DIRECTORY/" + config.getJreVersion()
+//      + " && env ; cd hdfs-mesos-* && "
+//      + "exec `if [ -z \"$JAVA_HOME\" ]; then echo java; "
+//      + "else echo $JAVA_HOME/bin/java; fi` "
+//      + "$HADOOP_OPTS "
+//      + "$EXECUTOR_OPTS "
+//      + "-cp lib/*.jar org.apache.mesos.hdfs.executor." + executorName;
+
+      String cmd = "env ; cd hdfs-mesos-* && "
+              + "exec `if [ -z \"$JAVA_HOME\" ]; then echo java; "
+              + "else echo $JAVA_HOME/bin/java; fi` "
+              + "$HADOOP_OPTS "
+              + "$EXECUTOR_OPTS "
+              + "-cp lib/*.jar org.apache.mesos.hdfs.executor." + executorName;
+
 
     return ExecutorInfo
       .newBuilder()
@@ -99,37 +107,37 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
                       .setType(ContainerInfo.Type.DOCKER)
                       .setDocker(
                               ContainerInfo.DockerInfo
-                              .newBuilder()
-                              .setForcePullImage(false)
-                              .setImage("localhost:5000/clust-hdfs")
-                              .setNetwork(ContainerInfo.DockerInfo.Network.BRIDGE)
-                              .build()
+                                      .newBuilder()
+                                      .setForcePullImage(false)
+                                      .setImage("localhost:5000/clust-hdfs")
+                                      .setNetwork(ContainerInfo.DockerInfo.Network.BRIDGE)
+                                      .build()
                       )
                       .build()
       )
       .setCommand(
               CommandInfo
                       .newBuilder()
-                      .addAllUris(
-                              Arrays.asList(
-                                      CommandInfo.URI
-                                              .newBuilder()
-                                              .setValue(
-                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                                                              confServerPort,
-                                                              HDFSConstants.HDFS_BINARY_FILE_NAME))
-                                              .build(),
-                                      CommandInfo.URI
-                                              .newBuilder()
-                                              .setValue(
-                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                                                              confServerPort,
-                                                              HDFSConstants.HDFS_CONFIG_FILE_NAME))
-                                              .build(),
-                                      CommandInfo.URI
-                                              .newBuilder()
-                                              .setValue(config.getJreUrl())
-                                              .build()))
+//                      .addAllUris(
+//                              Arrays.asList(
+//                                      CommandInfo.URI
+//                                              .newBuilder()
+//                                              .setValue(
+//                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+//                                                              confServerPort,
+//                                                              HDFSConstants.HDFS_BINARY_FILE_NAME))
+//                                              .build(),
+//                                      CommandInfo.URI
+//                                              .newBuilder()
+//                                              .setValue(
+//                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+//                                                              confServerPort,
+//                                                              HDFSConstants.HDFS_CONFIG_FILE_NAME))
+//                                              .build(),
+//                                      CommandInfo.URI
+//                                              .newBuilder()
+//                                              .setValue(config.getJreUrl())
+//                                              .build()))
                       .setEnvironment(Environment.newBuilder()
                               .addAllVariables(getExecutorEnvironment())).setValue(cmd).build())
       .build();
