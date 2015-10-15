@@ -4,6 +4,7 @@ import com.google.inject.Guice
 import org.apache.mesos.Protos
 import org.apache.mesos.SchedulerDriver
 import org.apache.mesos.hdfs.TestSchedulerModule
+import org.apache.mesos.hdfs.config.HdfsFrameworkConfig
 import org.apache.mesos.hdfs.state.AcquisitionPhase
 import org.apache.mesos.hdfs.state.HdfsState
 import org.apache.mesos.hdfs.state.StateMachine
@@ -21,13 +22,15 @@ class HdfsSchedulerSpec extends Specification {
   def driver = Mock(SchedulerDriver)
   def state = injector.getInstance(HdfsState.class)
   def scheduler
+  def config = Mock(HdfsFrameworkConfig)
 
   @Shared
   int offerCount = 1
 
   def setup() {
     stateMachine.reconciler >> reconciler
-    scheduler = new HdfsScheduler(null, state, stateMachine)
+    config.hdfsRole >> "*"
+    scheduler = new HdfsScheduler(config, state, stateMachine)
   }
 
   def "resource offers - reconciling"() {

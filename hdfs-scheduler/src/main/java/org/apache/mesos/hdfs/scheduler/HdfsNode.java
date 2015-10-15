@@ -4,15 +4,18 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.Environment;
-import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.SchedulerDriver;
 import org.apache.mesos.hdfs.config.HdfsFrameworkConfig;
+import org.apache.mesos.hdfs.config.NodeConfig;
 import org.apache.mesos.hdfs.state.HdfsState;
 import org.apache.mesos.hdfs.util.HDFSConstants;
+import org.apache.mesos.protobuf.CommandInfoUtil;
+import org.apache.mesos.protobuf.ExecutorInfoUtil;
+import org.apache.mesos.protobuf.ResourceFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,7 +39,7 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     this.state = state;
     this.config = config;
     this.name = name;
-    this.resourceFactory = new ResourceFactory(config);
+    this.resourceFactory = new ResourceFactory(config.getHdfsRole());
   }
 
   public String getName() {
@@ -76,7 +79,6 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
   }
 
   private ExecutorInfo createExecutor(String taskIdName, String nodeName, String executorName) {
-    int confServerPort = config.getConfigServerPort();
 
     String cmd = "export JAVA_HOME=$MESOS_DIRECTORY/" + config.getJreVersion()
       + " && env ; cd hdfs-mesos-* && "
@@ -86,37 +88,25 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
       + "$EXECUTOR_OPTS "
       + "-cp lib/*.jar org.apache.mesos.hdfs.executor." + executorName;
 
-    return ExecutorInfo
-      .newBuilder()
+    return ExecutorInfoUtil.createExecutorInfoBuilder()
       .setName(nodeName + " executor")
-      .setExecutorId(ExecutorID.newBuilder().setValue("executor." + taskIdName).build())
+      .setExecutorId(ExecutorInfoUtil.createExecutorId("executor." + taskIdName))
       .addAllResources(getExecutorResources())
-      .setCommand(
-        CommandInfo
-          .newBuilder()
-          .addAllUris(
-            Arrays.asList(
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(
-                  String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                    confServerPort,
-                    HDFSConstants.HDFS_BINARY_FILE_NAME))
-                .build(),
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(
-                  String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                    confServerPort,
-                    HDFSConstants.HDFS_CONFIG_FILE_NAME))
-                .build(),
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(config.getJreUrl())
-                .build()))
-          .setEnvironment(Environment.newBuilder()
-            .addAllVariables(getExecutorEnvironment())).setValue(cmd).build())
+      .setCommand(CommandInfoUtil.createCmdInfo(cmd, getCmdUriList(), getExecutorEnvironment()))
       .build();
+  }
+
+  private List<CommandInfo.URI> getCmdUriList() {
+    int confServerPort = config.getConfigServerPort();
+    return Arrays.asList(
+      CommandInfoUtil.createCmdInfoUri(String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+        confServerPort,
+        HDFSConstants.HDFS_BINARY_FILE_NAME)),
+      CommandInfoUtil.createCmdInfoUri(
+        String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+          confServerPort,
+          HDFSConstants.HDFS_CONFIG_FILE_NAME)),
+      CommandInfoUtil.createCmdInfoUri(config.getJreUrl()));
   }
 
   private List<Environment.Variable> getExecutorEnvironment() {
@@ -159,6 +149,19 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
         return 0;
     }
   }
+
+  private List<Resource> getTaskResources(String taskType) {
+    NodeConfig nodeConfig = config.getNodeConfig(taskType);
+    double cpu = nodeConfig.getCpus();
+    double mem = nodeConfig.getMaxHeap() * config.getJvmOverhead();
+
+    List<Resource> resources = new ArrayList<Resource>();
+    resources.add(resourceFactory.createCpuResource(cpu));
+    resources.add(resourceFactory.createMemResource(mem));
+
+    return resources;
+  }
+
 
   private String getNextTaskName(String taskType) {
     int targetCount = getTaskTargetCount(taskType);
@@ -215,7 +218,7 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
     List<Task> tasks = new ArrayList<Task>();
 
     for (String type : getTaskTypes()) {
-      List<Resource> resources = resourceFactory.getTaskResources(type);
+      List<Resource> resources = getTaskResources(type);
       ExecutorInfo execInfo = createExecutor(taskIdName, name, executorName);
       String taskName = getNextTaskName(type);
 
