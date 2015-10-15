@@ -2,7 +2,9 @@ package org.apache.mesos.hdfs.scheduler;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.mesos.Protos;
 import org.apache.mesos.Protos.CommandInfo;
+import org.apache.mesos.Protos.ContainerInfo;
 import org.apache.mesos.Protos.Environment;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
@@ -91,31 +93,45 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
       .setName(nodeName + " executor")
       .setExecutorId(ExecutorID.newBuilder().setValue("executor." + taskIdName).build())
       .addAllResources(getExecutorResources())
+      .setContainer(
+              ContainerInfo
+                      .newBuilder()
+                      .setType(ContainerInfo.Type.DOCKER)
+                      .setDocker(
+                              ContainerInfo.DockerInfo
+                              .newBuilder()
+                              .setForcePullImage(false)
+                              .setImage("localhost:5000/clust-hdfs")
+                              .setNetwork(ContainerInfo.DockerInfo.Network.BRIDGE)
+                              .build()
+                      )
+                      .build()
+      )
       .setCommand(
-        CommandInfo
-          .newBuilder()
-          .addAllUris(
-            Arrays.asList(
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(
-                  String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                    confServerPort,
-                    HDFSConstants.HDFS_BINARY_FILE_NAME))
-                .build(),
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(
-                  String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-                    confServerPort,
-                    HDFSConstants.HDFS_CONFIG_FILE_NAME))
-                .build(),
-              CommandInfo.URI
-                .newBuilder()
-                .setValue(config.getJreUrl())
-                .build()))
-          .setEnvironment(Environment.newBuilder()
-            .addAllVariables(getExecutorEnvironment())).setValue(cmd).build())
+              CommandInfo
+                      .newBuilder()
+                      .addAllUris(
+                              Arrays.asList(
+                                      CommandInfo.URI
+                                              .newBuilder()
+                                              .setValue(
+                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+                                                              confServerPort,
+                                                              HDFSConstants.HDFS_BINARY_FILE_NAME))
+                                              .build(),
+                                      CommandInfo.URI
+                                              .newBuilder()
+                                              .setValue(
+                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+                                                              confServerPort,
+                                                              HDFSConstants.HDFS_CONFIG_FILE_NAME))
+                                              .build(),
+                                      CommandInfo.URI
+                                              .newBuilder()
+                                              .setValue(config.getJreUrl())
+                                              .build()))
+                      .setEnvironment(Environment.newBuilder()
+                              .addAllVariables(getExecutorEnvironment())).setValue(cmd).build())
       .build();
   }
 
