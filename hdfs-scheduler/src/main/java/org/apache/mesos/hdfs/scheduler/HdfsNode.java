@@ -118,8 +118,8 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
       .setCommand(
               CommandInfo
                       .newBuilder()
-//                      .addAllUris(
-//                              Arrays.asList(
+                      .addAllUris(
+                              Arrays.asList(
 //                                      CommandInfo.URI
 //                                              .newBuilder()
 //                                              .setValue(
@@ -127,17 +127,18 @@ public abstract class HdfsNode implements IOfferEvaluator, ILauncher {
 //                                                              confServerPort,
 //                                                              HDFSConstants.HDFS_BINARY_FILE_NAME))
 //                                              .build(),
-//                                      CommandInfo.URI
-//                                              .newBuilder()
-//                                              .setValue(
-//                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
-//                                                              confServerPort,
-//                                                              HDFSConstants.HDFS_CONFIG_FILE_NAME))
-//                                              .build(),
+                                      CommandInfo.URI
+                                              .newBuilder()
+                                              .setValue(
+                                                      String.format("http://%s:%d/%s", config.getFrameworkHostAddress(),
+                                                              confServerPort,
+                                                              HDFSConstants.HDFS_CONFIG_FILE_NAME))
+                                              .build()//,
 //                                      CommandInfo.URI
 //                                              .newBuilder()
 //                                              .setValue(config.getJreUrl())
-//                                              .build()))
+//                                              .build()
+              ))
                       .setEnvironment(Environment.newBuilder()
                               .addAllVariables(getExecutorEnvironment())).setValue(cmd).build())
       .build();
