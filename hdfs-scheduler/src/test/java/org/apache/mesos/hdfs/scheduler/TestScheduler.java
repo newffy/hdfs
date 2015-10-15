@@ -17,6 +17,7 @@ import org.apache.mesos.hdfs.state.AcquisitionPhase;
 import org.apache.mesos.hdfs.state.HdfsState;
 import org.apache.mesos.hdfs.state.StateMachine;
 import org.apache.mesos.hdfs.util.HDFSConstants;
+import org.apache.mesos.protobuf.OfferUtil;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -129,15 +130,10 @@ public class TestScheduler {
   }
 
   private OfferID createTestOfferId(int instanceNumber) {
-    return OfferID.newBuilder().setValue("offer" + instanceNumber).build();
+    return OfferUtil.createOfferID("offer" + instanceNumber);
   }
 
   private Offer createTestOffer(int instanceNumber) {
-    return Offer.newBuilder()
-      .setId(createTestOfferId(instanceNumber))
-      .setFrameworkId(FrameworkID.newBuilder().setValue("framework1").build())
-      .setSlaveId(SlaveID.newBuilder().setValue("slave" + instanceNumber).build())
-      .setHostname("host" + instanceNumber)
-      .build();
+    return OfferUtil.createOffer("framework1", "" + instanceNumber, "slave" + instanceNumber, "host" + instanceNumber);
   }
 }
