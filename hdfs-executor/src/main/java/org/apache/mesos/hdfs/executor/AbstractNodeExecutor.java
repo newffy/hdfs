@@ -240,9 +240,10 @@ public abstract class AbstractNodeExecutor implements Executor {
    * Reloads the cluster configuration so the executor has the correct configuration info.
    */
   protected void reloadConfig() {
-    if (config.usingNativeHadoopBinaries()) {
-      return;
-    }
+    //TODO config loading should have separate settings (for docker usage)
+//    if (config.usingNativeHadoopBinaries()) {
+//      return;
+//    }
     // Find config URI
     String configUri = "";
     for (CommandInfo.URI uri : executorInfo.getCommand().getUrisList()) {
